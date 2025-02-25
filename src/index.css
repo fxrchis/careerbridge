@@ -1,0 +1,273 @@
+/* Import Tailwind base styles */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  /* Define custom color palette variables */
+  :root {
+    --primary-50: 236 253 245;
+    --primary-100: 209 250 229;
+    --primary-200: 167 243 208;
+    --primary-300: 110 231 183;
+    --primary-400: 52 211 153;
+    --primary-500: 16 185 129;
+    --primary-600: 5 150 105;
+    --primary-700: 4 120 87;
+    --primary-800: 6 95 70;
+    --primary-900: 4 78 56;
+    font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+    line-height: 1.5;
+    font-weight: 400;
+
+    color-scheme: light dark;
+    color: rgba(255, 255, 255, 0.87);
+    background-color: #242424;
+
+    font-synthesis: none;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Set default background color and typography */
+  body {
+    @apply antialiased text-gray-900 bg-gray-50;
+    margin: 0;
+    min-width: 100vw;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Remove default button outline */
+  button, [type='button'], [type='reset'], [type='submit'] {
+    @apply focus:outline-none;
+  }
+
+  /* Set default link styles */
+  a {
+    font-weight: 500;
+    color: #646cff;
+    text-decoration: inherit;
+  }
+  a:hover {
+    color: #535bf2;
+  }
+
+  /* Set default heading styles */
+  h1 {
+    font-size: 3.2em;
+    line-height: 1.1;
+  }
+
+  /* Set default button styles */
+  button {
+    border-radius: 8px;
+    border: 1px solid transparent;
+    padding: 0.6em 1.2em;
+    font-size: 1em;
+    font-weight: 500;
+    font-family: inherit;
+    background-color: #1a1a1a;
+    cursor: pointer;
+    transition: border-color 0.25s;
+  }
+  button:hover {
+    border-color: #646cff;
+  }
+
+  /* Set default root element styles */
+  #root {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+}
+
+/* Media query for light color scheme */
+@media (prefers-color-scheme: light) {
+  :root {
+    color: #213547;
+    background-color: #ffffff;
+  }
+  a:hover {
+    color: #747bff;
+  }
+  button {
+    background-color: #f9f9f9;
+  }
+}
+
+@layer components {
+  /* Animation utility classes */
+  .animate-fade-in {
+    @apply opacity-0 animate-[fadeIn_0.5s_ease-in-out_forwards];
+  }
+
+  .animate-slide-up {
+    @apply opacity-0 translate-y-4 animate-[slideUp_0.5s_ease-out_forwards];
+  }
+
+  .animate-scale {
+    @apply scale-95 opacity-0 animate-[scale_0.3s_ease-out_forwards];
+  }
+
+  /* Card hover animation */
+  .card-hover {
+    @apply transition-all duration-300 hover:shadow-lg hover:-translate-y-1;
+  }
+
+  /* Gradient text effect */
+  .gradient-text {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-primary-600 to-primary-800;
+  }
+
+  /* Button base styles */
+  .btn {
+    @apply inline-flex items-center justify-center px-4 py-2 rounded-lg font-medium transition-all duration-300 
+    focus:outline-none focus:ring-2 focus:ring-offset-2 transform hover:scale-105 active:scale-95;
+  }
+
+  /* Primary button */
+  .btn-primary {
+    @apply btn bg-gradient-to-r from-primary-600 to-primary-500 text-white shadow-md
+    hover:from-primary-500 hover:to-primary-400 hover:shadow-lg hover:text-white
+    focus:ring-primary-500;
+  }
+
+  /* Secondary button */
+  .btn-secondary {
+    @apply btn border-2 border-primary-600 text-primary-600
+    hover:bg-primary-50 hover:border-primary-500 hover:text-primary-500
+    focus:ring-primary-500;
+  }
+
+  /* Danger button */
+  .btn-danger {
+    @apply btn bg-gradient-to-r from-red-600 to-red-500 text-white shadow-md
+    hover:from-red-500 hover:to-red-400 hover:shadow-lg hover:text-white
+    focus:ring-red-500;
+  }
+
+  /* Success button */
+  .btn-success {
+    @apply btn bg-gradient-to-r from-green-600 to-green-500 text-white shadow-md
+    hover:from-green-500 hover:to-green-400 hover:shadow-lg hover:text-white
+    focus:ring-green-500;
+  }
+
+  /* Small button */
+  .btn-sm {
+    @apply px-3 py-1.5 text-sm;
+  }
+
+  /* Large button */
+  .btn-lg {
+    @apply px-6 py-3 text-lg;
+  }
+
+  /* Icon button */
+  .btn-icon {
+    @apply p-2 rounded-full;
+  }
+
+  /* Disabled button */
+  .btn-disabled {
+    @apply opacity-50 cursor-not-allowed hover:scale-100 active:scale-100;
+  }
+
+  /* Primary button styles */
+  .btn-primary {
+    @apply px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors duration-200;
+  }
+
+  /* Secondary button styles */
+  .btn-secondary {
+    @apply px-4 py-2 bg-white text-primary-600 border border-primary-600 rounded-md hover:bg-primary-50 transition-colors duration-200;
+  }
+
+  /* Primary input styles */
+  .input-primary {
+    @apply block w-full rounded-lg border-gray-300 border px-4 py-3 bg-white/50 backdrop-blur-sm
+    focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all duration-200
+    hover:border-primary-400 placeholder:text-gray-400;
+  }
+
+  /* Mobile menu item hover */
+  .mobile-menu-item {
+    @apply block px-3 py-2 rounded-md text-base font-medium text-gray-700
+    hover:text-primary-600 hover:bg-primary-50 transition-all duration-200;
+  }
+
+  /* Animation for auth page */
+  .animate-blob {
+    animation: blob 7s infinite;
+  }
+}
+
+@layer utilities {
+  .animation-delay-2000 {
+    animation-delay: 2s;
+  }
+  .animation-delay-4000 {
+    animation-delay: 4s;
+  }
+}
+
+/* Animation keyframes */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(1rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scale {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes blob {
+  0% {
+    transform: translate(0px, 0px) scale(1);
+  }
+  33% {
+    transform: translate(30px, -50px) scale(1.1);
+  }
+  66% {
+    transform: translate(-20px, 20px) scale(0.9);
+  }
+  100% {
+    transform: translate(0px, 0px) scale(1);
+  }
+}
+
+/* Glass panel effect */
+.glass-effect {
+  @apply backdrop-blur-md bg-white/80 border border-white/20;
+}
+
+/* Text gradient effect */
+.text-gradient {
+  @apply bg-clip-text text-transparent bg-gradient-to-r from-primary-600 to-primary-800;
+}
+
+/* Button gradient effect */
+.button-gradient {
+  @apply bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800;
+}
