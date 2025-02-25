@@ -1,480 +1,395 @@
 import { useState, useEffect } from 'react';
-import { collection, query, getDocs, updateDoc, doc, setDoc, deleteDoc } from 'firebase/firestore';
-import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { db, auth, ROLES } from '../config/firebase';
-import { useAuth } from '../contexts/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
+import { 
+  FiUsers, 
+  FiBriefcase, 
+  FiUserPlus, 
+  FiCheck, 
+  FiX,
+  FiAlertTriangle,
+  FiMail,
+  FiPhone,
+  FiBuilding,
+  FiMapPin,
+  FiDollarSign,
+  FiCalendar
+} from 'react-icons/fi';
+import { createUser, getPendingJobs, updateJob } from '../utils/firebase';
+import { collection, query, getDocs } from 'firebase/firestore';
+import { db, COLLECTIONS, ROLES, JOB_STATUS, UserDocument, JobDocument } from '../config/firebase';
 
 const AdminPanel = () => {
-  const [users, setUsers] = useState<any[]>([]);
+  const [activeTab, setActiveTab] = useState<'users' | 'jobs' | 'create'>('users');
+  const [users, setUsers] = useState<UserDocument[]>([]);
+  const [pendingJobs, setPendingJobs] = useState<JobDocument[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
-  const [newEmployer, setNewEmployer] = useState({
+  const [formData, setFormData] = useState({
+    name: '',
     email: '',
-    password: '',
-    companyName: '',
-    contactPerson: '',
-    phoneNumber: '',
-    employerName: '',
+    phone: '',
+    company: '',
+    password: ''
   });
-  const [selectedTab, setSelectedTab] = useState('users');
-  const [jobs, setJobs] = useState<any[]>([]);
-
-  const { currentUser, isAdmin } = useAuth();
-  const navigate = useNavigate();
 
   useEffect(() => {
-    if (!isAdmin) {
-      navigate('/');
-      return;
-    }
+    fetchData();
+  }, []);
 
-    fetchUsers();
-    fetchJobs();
-  }, [isAdmin, navigate]);
-
-  const fetchUsers = async () => {
+  const fetchData = async () => {
     try {
-      const usersRef = collection(db, 'users');
-      const q = query(usersRef);
-      const querySnapshot = await getDocs(q);
-      const usersData = querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
+      const usersQuery = query(collection(db, COLLECTIONS.USERS));
+      const usersSnapshot = await getDocs(usersQuery);
+      const usersData = usersSnapshot.docs.map(doc => ({ 
+        uid: doc.id, 
+        ...doc.data() 
+      })) as UserDocument[];
       setUsers(usersData);
-    } catch (err) {
-      console.error('Error fetching users:', err);
-      setError('Failed to fetch users');
+
+      const pendingJobsData = await getPendingJobs();
+      setPendingJobs(pendingJobsData);
+    } catch (error) {
+      console.error('Error fetching data:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  const fetchJobs = async () => {
+  const handleJobAction = async (jobId: string, status: typeof JOB_STATUS[keyof typeof JOB_STATUS]) => {
     try {
-      console.log('Fetching jobs for admin panel...');
-      const jobsRef = collection(db, 'jobs');
-      const querySnapshot = await getDocs(jobsRef);
-      const jobsData = querySnapshot.docs.map(doc => {
-        const data = doc.data();
-        console.log('Job data:', { id: doc.id, ...data });
-        return {
-          id: doc.id,
-          ...data
-        };
-      });
-      setJobs(jobsData);
-    } catch (err) {
-      console.error('Error fetching jobs:', err);
-      setError('Failed to fetch jobs');
+      await updateJob(jobId, { status });
+      await fetchData();
+    } catch (error) {
+      console.error('Error updating job:', error);
     }
   };
 
-  const createEmployerAccount = async (e: React.FormEvent) => {
+  const handleCreateEmployer = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
-    setSuccess('');
-    
-    if (!newEmployer.email || !newEmployer.password || !newEmployer.companyName || 
-        !newEmployer.employerName || !newEmployer.phoneNumber) {
-      setError('Please fill in all required fields');
-      return;
-    }
-    
+    setLoading(true);
+
     try {
-      
-      const userCredential = await createUserWithEmailAndPassword(
-        auth,
-        newEmployer.email,
-        newEmployer.password
-      );
-
-      
-      await setDoc(doc(db, 'users', userCredential.user.uid), {
-        email: newEmployer.email,
-        role: ROLES.EMPLOYER,
-        companyName: newEmployer.companyName,
-        employerName: newEmployer.employerName,
-        phoneNumber: newEmployer.phoneNumber,
-        contactPerson: newEmployer.contactPerson || null,
-        createdAt: new Date().toISOString(),
-        createdBy: currentUser?.uid,
-      });
-
-      setSuccess('Employer account created successfully!');
-      setNewEmployer({
-        email: '',
-        password: '',
-        companyName: '',
-        contactPerson: '',
-        phoneNumber: '',
-        employerName: '',
-      });
-      fetchUsers();
-    } catch (err: any) {
-      console.error('Error creating employer account:', err);
-      setError(err.message || 'Failed to create employer account');
+      await createUser(formData.email, formData.password, formData.name, formData.phone, ROLES.EMPLOYER, formData.company);
+      setFormData({ name: '', email: '', phone: '', company: '', password: '' });
+      await fetchData();
+    } catch (error) {
+      console.error('Error creating employer:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const getRoleColor = (role: string) => {
-    switch (role) {
-      case ROLES.ADMIN:
-        return 'bg-red-100 text-red-800';
-      case ROLES.EMPLOYER:
-        return 'bg-blue-100 text-blue-800';
-      case ROLES.STUDENT:
-        return 'bg-green-100 text-green-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const handleJobAction = async (jobId: string, action: 'approve' | 'delete') => {
-    try {
-      const jobRef = doc(db, 'jobs', jobId);
-      
-      if (action === 'approve') {
-        console.log('Approving job:', jobId);
-        const updateData = {
-          status: 'approved',
-          approvedAt: new Date().toISOString(),
-          approvedBy: currentUser?.uid
-        };
-        console.log('Update data:', updateData);
-        await updateDoc(jobRef, updateData);
-        setSuccess('Job posting approved successfully!');
-      } else {
-        console.log('Deleting job:', jobId);
-        await deleteDoc(jobRef);
-        setSuccess('Job posting deleted successfully!');
-      }
-      
-      fetchJobs();
-    } catch (err) {
-      console.error(`Error ${action}ing job:`, err);
-      setError(`Failed to ${action} job posting`);
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen pt-20 pb-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-center items-center h-64">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const tabs = [
+    { id: 'users', label: 'User Management', icon: FiUsers },
+    { id: 'jobs', label: 'Job Approvals', icon: FiBriefcase },
+    { id: 'create', label: 'Create Employer', icon: FiUserPlus }
+  ] as const;
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white pt-20 pb-12">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="bg-white shadow-lg rounded-lg overflow-hidden border-t-4 border-blue-800">
+    <div className="min-h-screen bg-gradient-to-b from-green-50 to-white py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-7xl mx-auto">
+        <div className="text-center mb-8">
+          <h1 className="text-4xl font-bold text-gray-900 mb-2">Admin Dashboard</h1>
+          <p className="text-lg text-gray-600">Manage users, approve jobs, and create employer accounts</p>
+        </div>
+
+        <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
+          <div className="border-b border-gray-200 bg-white sticky top-0 z-10">
+            <nav className="flex justify-center space-x-4 p-4">
+              {tabs.map(tab => (
+                <motion.button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`flex items-center px-6 py-3 rounded-xl text-sm font-medium transition-all ${
+                    activeTab === tab.id
+                      ? 'bg-green-100 text-green-700 shadow-sm'
+                      : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                  }`}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  <tab.icon className="w-5 h-5 mr-2" />
+                  {tab.label}
+                </motion.button>
+              ))}
+            </nav>
+          </div>
+
           <div className="p-6">
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center">
-                <svg className="w-8 h-8 text-blue-800 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/>
-                </svg>
-                <h2 className="text-2xl font-bold text-gray-900">Admin Panel</h2>
-              </div>
-            </div>
-
-            {error && (
-              <div className="mb-4 p-4 bg-red-50 border-l-4 border-red-400 text-red-700">
-                <p className="text-sm">{error}</p>
-              </div>
-            )}
-
-            {success && (
-              <div className="mb-4 p-4 bg-green-50 border-l-4 border-green-400 text-green-700">
-                <p className="text-sm">{success}</p>
-              </div>
-            )}
-
-            <div className="mb-8">
-              <div className="flex space-x-4 mb-6">
-                <button
-                  onClick={() => setSelectedTab('users')}
-                  className={`px-4 py-2 rounded-md ${
-                    selectedTab === 'users'
-                      ? 'bg-blue-800 text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
+            <AnimatePresence mode="wait">
+              {activeTab === 'users' && (
+                <motion.div
+                  key="users"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  className="space-y-6"
                 >
-                  Manage Users
-                </button>
-                <button
-                  onClick={() => setSelectedTab('jobs')}
-                  className={`px-4 py-2 rounded-md ${
-                    selectedTab === 'jobs'
-                      ? 'bg-blue-800 text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
-                >
-                  Manage Jobs
-                </button>
-                <button
-                  onClick={() => setSelectedTab('employers')}
-                  className={`px-4 py-2 rounded-md ${
-                    selectedTab === 'employers'
-                      ? 'bg-blue-800 text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
-                >
-                  Create Employer
-                </button>
-              </div>
+                  <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
+                            <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contact</th>
+                            <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
+                            <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Company</th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {users.map((user) => (
+                            <tr key={user.uid} className="hover:bg-gray-50 transition-colors">
+                              <td className="px-6 py-4">
+                                <div className="flex items-center">
+                                  <div className="h-10 w-10 flex-shrink-0">
+                                    <div className="h-10 w-10 rounded-full bg-green-100 flex items-center justify-center">
+                                      <span className="text-green-700 font-medium text-sm">
+                                        {user.name?.charAt(0).toUpperCase() || user.email.charAt(0).toUpperCase()}
+                                      </span>
+                                    </div>
+                                  </div>
+                                  <div className="ml-4">
+                                    <div className="text-sm font-medium text-gray-900">{user.name}</div>
+                                    <div className="text-sm text-gray-500">{user.email}</div>
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="px-6 py-4">
+                                <div className="text-sm text-gray-900 flex items-center">
+                                  <FiPhone className="mr-2" />
+                                  {user.phone}
+                                </div>
+                              </td>
+                              <td className="px-6 py-4">
+                                <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+                                  user.role === ROLES.ADMIN ? 'bg-purple-100 text-purple-800' :
+                                  user.role === ROLES.EMPLOYER ? 'bg-blue-100 text-blue-800' :
+                                  'bg-green-100 text-green-800'
+                                }`}>
+                                  {user.role}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4">
+                                <div className="text-sm text-gray-900 flex items-center">
+                                  <FiBuilding className="mr-2" />
+                                  {user.company || '-'}
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
 
-              {selectedTab === 'employers' && (
-                <div className="bg-white p-6 rounded-lg border border-gray-200">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Create Employer Account</h3>
-                  <form onSubmit={createEmployerAccount} className="space-y-6">
-                    <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+              {activeTab === 'jobs' && (
+                <motion.div
+                  key="jobs"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  className="space-y-6"
+                >
+                  {pendingJobs.map((job) => (
+                    <motion.div
+                      key={job.id}
+                      className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow"
+                      whileHover={{ y: -2 }}
+                    >
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <h3 className="text-xl font-semibold text-gray-900">{job.title}</h3>
+                          <div className="mt-2 flex items-center text-sm text-gray-500">
+                            <FiBuilding className="mr-2" />
+                            {job.company}
+                          </div>
+                        </div>
+                        <div className="flex space-x-3">
+                          <motion.button
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                            onClick={() => handleJobAction(job.id, JOB_STATUS.APPROVED)}
+                            className="inline-flex items-center px-4 py-2 rounded-xl text-sm font-medium text-white bg-green-600 hover:bg-green-700 transition-colors"
+                          >
+                            <FiCheck className="w-4 h-4 mr-2" />
+                            Approve
+                          </motion.button>
+                          <motion.button
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                            onClick={() => handleJobAction(job.id, JOB_STATUS.REJECTED)}
+                            className="inline-flex items-center px-4 py-2 rounded-xl text-sm font-medium text-white bg-red-600 hover:bg-red-700 transition-colors"
+                          >
+                            <FiX className="w-4 h-4 mr-2" />
+                            Reject
+                          </motion.button>
+                        </div>
+                      </div>
+
+                      <div className="mt-4 grid grid-cols-2 gap-6">
+                        <div className="space-y-4">
+                          <div>
+                            <h4 className="text-sm font-medium text-gray-900 mb-2">Description</h4>
+                            <p className="text-sm text-gray-600">{job.description}</p>
+                          </div>
+                          <div className="flex items-center space-x-6">
+                            <div className="flex items-center text-sm text-gray-500">
+                              <FiMapPin className="mr-2" />
+                              {job.location}
+                            </div>
+                            <div className="flex items-center text-sm text-gray-500">
+                              <FiDollarSign className="mr-2" />
+                              {job.salary}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="space-y-4">
+                          <div>
+                            <h4 className="text-sm font-medium text-gray-900 mb-2">Requirements</h4>
+                            <p className="text-sm text-gray-600">{job.requirements}</p>
+                          </div>
+                          <div className="flex items-center space-x-6">
+                            <div className="flex items-center text-sm text-gray-500">
+                              <FiBriefcase className="mr-2" />
+                              {job.type}
+                            </div>
+                            <div className="flex items-center text-sm text-gray-500">
+                              <FiCalendar className="mr-2" />
+                              {new Date(job.createdAt).toLocaleDateString()}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </motion.div>
+                  ))}
+                  {pendingJobs.length === 0 && (
+                    <div className="text-center py-12">
+                      <FiAlertTriangle className="mx-auto h-12 w-12 text-gray-400" />
+                      <h3 className="mt-4 text-lg font-medium text-gray-900">No pending jobs</h3>
+                      <p className="mt-2 text-gray-500">There are no jobs waiting for approval at the moment.</p>
+                    </div>
+                  )}
+                </motion.div>
+              )}
+
+              {activeTab === 'create' && (
+                <motion.div
+                  key="create"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  className="max-w-2xl mx-auto"
+                >
+                  <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
+                    <h2 className="text-2xl font-semibold text-gray-900 mb-6">Create Employer Account</h2>
+                    <form onSubmit={handleCreateEmployer} className="space-y-6">
                       <div>
-                        <label htmlFor="employerName" className="block text-sm font-medium text-gray-700">
-                          Employer Name *
+                        <label className="flex items-center text-sm font-medium text-gray-700 mb-2">
+                          <FiUsers className="mr-2" />
+                          Full Name
                         </label>
                         <input
                           type="text"
-                          id="employerName"
-                          value={newEmployer.employerName}
-                          onChange={(e) => setNewEmployer({ ...newEmployer, employerName: e.target.value })}
-                          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                          value={formData.name}
+                          onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
                           required
+                          className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-green-500 focus:border-transparent transition-shadow"
+                          placeholder="Enter full name"
                         />
                       </div>
 
                       <div>
-                        <label htmlFor="companyName" className="block text-sm font-medium text-gray-700">
-                          Company Name *
-                        </label>
-                        <input
-                          type="text"
-                          id="companyName"
-                          value={newEmployer.companyName}
-                          onChange={(e) => setNewEmployer({ ...newEmployer, companyName: e.target.value })}
-                          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                          required
-                        />
-                      </div>
-
-                      <div>
-                        <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                          Email Address *
+                        <label className="flex items-center text-sm font-medium text-gray-700 mb-2">
+                          <FiMail className="mr-2" />
+                          Email Address
                         </label>
                         <input
                           type="email"
-                          id="email"
-                          value={newEmployer.email}
-                          onChange={(e) => setNewEmployer({ ...newEmployer, email: e.target.value })}
-                          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                          value={formData.email}
+                          onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
                           required
+                          className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-green-500 focus:border-transparent transition-shadow"
+                          placeholder="Enter email address"
                         />
                       </div>
 
                       <div>
-                        <label htmlFor="phoneNumber" className="block text-sm font-medium text-gray-700">
-                          Phone Number *
+                        <label className="flex items-center text-sm font-medium text-gray-700 mb-2">
+                          <FiPhone className="mr-2" />
+                          Phone Number
                         </label>
                         <input
                           type="tel"
-                          id="phoneNumber"
-                          value={newEmployer.phoneNumber}
-                          onChange={(e) => setNewEmployer({ ...newEmployer, phoneNumber: e.target.value })}
-                          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                          value={formData.phone}
+                          onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
                           required
+                          className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-green-500 focus:border-transparent transition-shadow"
+                          placeholder="Enter phone number"
                         />
                       </div>
 
                       <div>
-                        <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-                          Password *
-                        </label>
-                        <input
-                          type="password"
-                          id="password"
-                          value={newEmployer.password}
-                          onChange={(e) => setNewEmployer({ ...newEmployer, password: e.target.value })}
-                          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                          required
-                        />
-                      </div>
-
-                      <div>
-                        <label htmlFor="contactPerson" className="block text-sm font-medium text-gray-700">
-                          Additional Contact Person
+                        <label className="flex items-center text-sm font-medium text-gray-700 mb-2">
+                          <FiBuilding className="mr-2" />
+                          Company Name
                         </label>
                         <input
                           type="text"
-                          id="contactPerson"
-                          value={newEmployer.contactPerson}
-                          onChange={(e) => setNewEmployer({ ...newEmployer, contactPerson: e.target.value })}
-                          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                          value={formData.company}
+                          onChange={(e) => setFormData(prev => ({ ...prev, company: e.target.value }))}
+                          required
+                          className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-green-500 focus:border-transparent transition-shadow"
+                          placeholder="Enter company name"
                         />
                       </div>
-                    </div>
 
-                    <div className="flex justify-end">
-                      <button
-                        type="submit"
-                        className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-800 hover:bg-blue-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                      >
-                        Create Employer Account
-                      </button>
-                    </div>
-                  </form>
-                </div>
-              )}
-
-              {selectedTab === 'users' && (
-                <div className="bg-white p-6 rounded-lg border border-gray-200">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Manage Users</h3>
-                  <div className="flex flex-col">
-                    <div className="-my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
-                      <div className="py-2 align-middle inline-block min-w-full sm:px-6 lg:px-8">
-                        <div className="shadow overflow-hidden border-b border-gray-200 sm:rounded-lg">
-                          <table className="min-w-full divide-y divide-gray-200">
-                            <thead className="bg-gray-50">
-                              <tr>
-                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                  Email
-                                </th>
-                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                  Role
-                                </th>
-                                <th scope="col" className="relative px-6 py-3">
-                                  <span className="sr-only">Actions</span>
-                                </th>
-                              </tr>
-                            </thead>
-                            <tbody className="bg-white divide-y divide-gray-200">
-                              {users.map((user) => (
-                                <tr key={user.id}>
-                                  <td className="px-6 py-4 whitespace-nowrap">
-                                    <div className="text-sm font-medium text-gray-900">{user.email}</div>
-                                  </td>
-                                  <td className="px-6 py-4 whitespace-nowrap">
-                                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getRoleColor(user.role)}`}>
-                                      {user.role}
-                                    </span>
-                                  </td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
+                      <div>
+                        <label className="flex items-center text-sm font-medium text-gray-700 mb-2">
+                          <FiUsers className="mr-2" />
+                          Password
+                        </label>
+                        <input
+                          type="password"
+                          value={formData.password}
+                          onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
+                          required
+                          className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-green-500 focus:border-transparent transition-shadow"
+                          placeholder="Enter password"
+                        />
                       </div>
-                    </div>
-                  </div>
-                </div>
-              )}
 
-              {selectedTab === 'jobs' && (
-                <div className="bg-white p-6 rounded-lg border border-gray-200">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Manage Jobs</h3>
-                  <div className="flex flex-col">
-                    <div className="-my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
-                      <div className="py-2 align-middle inline-block min-w-full sm:px-6 lg:px-8">
-                        <div className="shadow overflow-hidden border-b border-gray-200 sm:rounded-lg">
-                          <table className="min-w-full divide-y divide-gray-200">
-                            <thead className="bg-gray-50">
-                              <tr>
-                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                  Position
-                                </th>
-                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                  Company
-                                </th>
-                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                  Status
-                                </th>
-                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                  Posted Date
-                                </th>
-                                <th scope="col" className="relative px-6 py-3">
-                                  <span className="sr-only">Actions</span>
-                                </th>
-                              </tr>
-                            </thead>
-                            <tbody className="bg-white divide-y divide-gray-200">
-                              {jobs.map((job) => (
-                                <tr key={job.id}>
-                                  <td className="px-6 py-4 whitespace-nowrap">
-                                    <div className="text-sm font-medium text-gray-900">{job.title}</div>
-                                    <div className="text-sm text-gray-500">{job.type}</div>
-                                  </td>
-                                  <td className="px-6 py-4 whitespace-nowrap">
-                                    <div className="text-sm text-gray-900">{job.company}</div>
-                                    <div className="text-sm text-gray-500">{job.location}</div>
-                                  </td>
-                                  <td className="px-6 py-4 whitespace-nowrap">
-                                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                                      job.status === 'approved' 
-                                        ? 'bg-green-100 text-green-800' 
-                                        : job.status === 'pending'
-                                        ? 'bg-yellow-100 text-yellow-800'
-                                        : 'bg-gray-100 text-gray-800'
-                                    }`}>
-                                      {job.status}
-                                    </span>
-                                  </td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                    {new Date(job.createdAt).toLocaleDateString()}
-                                  </td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                    {job.status === 'pending' && (
-                                      <div className="flex space-x-2 justify-end">
-                                        <button
-                                          onClick={() => handleJobAction(job.id, 'approve')}
-                                          className="inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md text-white bg-blue-800 hover:bg-blue-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                                        >
-                                          <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"/>
-                                          </svg>
-                                          Approve
-                                        </button>
-                                        <button
-                                          onClick={() => handleJobAction(job.id, 'delete')}
-                                          className="inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-                                        >
-                                          <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-                                          </svg>
-                                          Delete
-                                        </button>
-                                      </div>
-                                    )}
-                                    {job.status === 'approved' && (
-                                      <button
-                                        onClick={() => handleJobAction(job.id, 'delete')}
-                                        className="inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-                                      >
-                                        <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-                                        </svg>
-                                        Delete
-                                      </button>
-                                    )}
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
+                      <div className="pt-4">
+                        <motion.button
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                          type="submit"
+                          disabled={loading}
+                          className={`w-full inline-flex justify-center items-center px-6 py-3 border border-transparent text-base font-medium rounded-xl text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors ${
+                            loading ? 'opacity-50 cursor-not-allowed' : ''
+                          }`}
+                        >
+                          {loading ? (
+                            <>
+                              <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                              </svg>
+                              Creating Account...
+                            </>
+                          ) : (
+                            <>
+                              <FiUserPlus className="w-5 h-5 mr-2" />
+                              Create Employer Account
+                            </>
+                          )}
+                        </motion.button>
                       </div>
-                    </div>
+                    </form>
                   </div>
-                </div>
+                </motion.div>
               )}
-            </div>
+            </AnimatePresence>
           </div>
         </div>
       </div>

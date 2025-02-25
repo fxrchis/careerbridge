@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { FiDownload, FiGithub, FiFileText } from 'react-icons/fi';
+import { FiGithub } from 'react-icons/fi';
 
 const JudgesAccess = () => {
   const projectLinks = [
@@ -7,22 +7,8 @@ const JudgesAccess = () => {
       title: 'Project Repository',
       description: 'Access the complete source code and project files',
       icon: FiGithub,
-      url: 'https://github.com/yourusername/careerbridge',
+      url: 'https://github.com/fxrchis/careerbridge',
       buttonText: 'View Repository'
-    },
-    {
-      title: 'Documentation',
-      description: 'View detailed project documentation and setup instructions',
-      icon: FiFileText,
-      url: 'https://docs.google.com/document/d/your-doc-id',
-      buttonText: 'View Documentation'
-    },
-    {
-      title: 'Project Download',
-      description: 'Download the complete project as a ZIP file',
-      icon: FiDownload,
-      url: 'https://drive.google.com/file/d/your-file-id',
-      buttonText: 'Download ZIP'
     }
   ];
 
@@ -36,7 +22,7 @@ const JudgesAccess = () => {
           </p>
         </div>
 
-        <div className="grid md:grid-cols-3 gap-8">
+        <div className="grid md:grid-cols-1 gap-8">
           {projectLinks.map((link, index) => (
             <motion.div
               key={index}
