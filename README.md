@@ -7,15 +7,3 @@ Browse the code directly on GitHub:
    - `/src/contexts` - Context providers
    - `/src/config` - Configuration files
 
-
-
-
-careerbridge/
-├── src/                  # Source code
-│   ├── pages/           # Page components
-│   ├── components/      # Reusable components
-│   ├── contexts/        # React contexts
-│   ├── config/          # Configuration files
-│   └── utils/           # Utility functions
-├── public/              # Static assets
-└── package.json         # Project dependencies
