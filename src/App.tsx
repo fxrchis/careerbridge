@@ -9,7 +9,7 @@ import Home from './pages/Home';
 import Auth from './pages/Auth.tsx';
 import JobPostings from './pages/JobPostings';
 import SubmitPosting from './pages/SubmitPosting';
-import ApplyJob from './pages/ApplyJob';
+import StudentApply from './pages/StudentApply';
 import AdminPanel from './pages/AdminPanel';
 import Settings from './pages/Settings';
 import Help from './pages/Help';
@@ -68,7 +68,7 @@ function App() {
 
                   {/* Protected student routes */}
                   <Route element={<ProtectedRoute allowedRoles={[ROLES.STUDENT]} />}>
-                    <Route path="/apply/:jobId" element={<ApplyJob />} />
+                    <Route path="/job/:jobId/apply" element={<StudentApply />} />
                     <Route path="/my-applications" element={<StudentDashboard />} />
                   </Route>
                   

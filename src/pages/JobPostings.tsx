@@ -72,7 +72,7 @@ const JobCard = ({ job }: { job: JobPosting }) => (
           </span>
         ) : (
           <Link
-            to={`/apply/${job.id}`}
+            to={`/job/${job.id}/apply`}
             className="btn-primary group flex items-center"
           >
             Apply Now
