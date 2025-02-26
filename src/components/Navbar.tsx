@@ -23,6 +23,11 @@ const Navbar = () => {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
+  // Close mobile menu when route changes
+  useEffect(() => {
+    setIsOpen(false);
+  }, [location.pathname]);
+
   const handleLogout = async () => {
     try {
       await logout();
@@ -48,20 +53,20 @@ const Navbar = () => {
   ];
 
   return (
-    <nav className={`fixed w-full top-0 z-50 transition-all duration-300 ${scrolled ? 'py-4' : 'py-6'}`}>
+    <nav className={`fixed w-full top-0 z-50 transition-all duration-300 ${scrolled ? 'py-2 sm:py-4' : 'py-3 sm:py-6'}`}>
       <motion.div 
         initial={{ y: -100 }}
         animate={{ y: 0 }}
-        className={`glass-effect shadow-lg backdrop-blur-md w-full h-20 flex items-center ${
+        className={`glass-effect shadow-lg backdrop-blur-md w-full flex items-center ${
           scrolled ? 'bg-white/90' : 'bg-white/80'
         }`}
       >
-        <div className="w-full px-8">
-          <div className="flex justify-between items-center h-full">
+        <div className="w-full px-4 sm:px-8">
+          <div className="flex justify-between items-center h-16 sm:h-20">
             {/* Logo */}
             <Link to="/" className="flex-shrink-0 flex items-center">
               <motion.span 
-                className="text-2xl font-bold text-gradient"
+                className="text-xl sm:text-2xl font-bold text-gradient"
                 whileHover={{ scale: 1.05 }}
                 transition={{ type: "spring", stiffness: 300 }}
               >
@@ -70,7 +75,7 @@ const Navbar = () => {
             </Link>
 
             {/* Desktop Navigation */}
-            <div className="hidden md:flex md:items-center md:space-x-8">
+            <div className="hidden lg:flex lg:items-center lg:space-x-8">
               {navLinks.map((link) => (
                 ((link.showFor === 'all') || (currentUser && link.showFor === userRole)) && (
                   <motion.div
@@ -99,21 +104,18 @@ const Navbar = () => {
                   </motion.div>
                 )
               ))}
-            </div>
 
-            {/* User Menu - Desktop */}
-            <div className="hidden md:flex md:items-center md:space-x-4">
+              {/* Desktop User Menu */}
               {currentUser ? (
                 <div className="relative">
                   <motion.button
+                    whileHover={{ y: -2 }}
                     onClick={() => setShowUserMenu(!showUserMenu)}
-                    className={`flex items-center space-x-2 px-3 py-2 text-sm font-medium rounded-md
-                      ${showUserMenu ? 'text-primary-600 bg-primary-50' : 'text-gray-700 hover:text-primary-600 hover:bg-primary-50'}`}
+                    className="flex items-center px-4 py-3 text-base font-medium text-gray-700 hover:text-primary-600 rounded-md hover:bg-primary-50"
                   >
-                    <FiUser className="w-4 h-4" />
-                    <span>{currentUser.displayName || currentUser.email}</span>
+                    <FiUser className="w-5 h-5 mr-2" />
+                    {currentUser.displayName || currentUser.email}
                   </motion.button>
-
                   <AnimatePresence>
                     {showUserMenu && (
                       <motion.div
@@ -122,123 +124,104 @@ const Navbar = () => {
                         exit={{ opacity: 0, y: 10 }}
                         className="absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5"
                       >
-                        <div className="py-1">
-                          <Link
-                            to="/settings"
-                            className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-primary-50 hover:text-primary-600"
-                          >
-                            <FiSettings className="w-4 h-4 mr-2" />
-                            Settings
-                          </Link>
-                          <button
-                            onClick={handleLogout}
-                            className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-primary-50 hover:text-primary-600"
-                          >
-                            <FiLogOut className="w-4 h-4 mr-2" />
-                            Sign out
-                          </button>
-                        </div>
+                        <button
+                          onClick={handleLogout}
+                          className="w-full flex items-center px-4 py-3 text-base font-medium text-gray-700 hover:text-primary-600 hover:bg-primary-50"
+                        >
+                          <FiLogOut className="w-5 h-5 mr-2" />
+                          Logout
+                        </button>
                       </motion.div>
                     )}
                   </AnimatePresence>
                 </div>
               ) : (
-                <motion.div
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
+                <Link
+                  to="/login"
+                  className="flex items-center px-4 py-3 text-base font-medium text-gray-700 hover:text-primary-600 rounded-md hover:bg-primary-50"
                 >
-                  <Link
-                    to="/auth"
-                    className="btn-primary"
-                  >
-                    Sign in
-                  </Link>
-                </motion.div>
+                  <FiUser className="w-5 h-5 mr-2" />
+                  Login
+                </Link>
               )}
             </div>
 
-            {/* Mobile menu button */}
-            <div className="flex items-center md:hidden">
-              <motion.button
-                whileTap={{ scale: 0.95 }}
+            {/* Mobile Menu Button */}
+            <div className="flex lg:hidden">
+              <button
                 onClick={() => setIsOpen(!isOpen)}
-                className="inline-flex items-center justify-center p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100 focus:outline-none"
+                className="inline-flex items-center justify-center p-2 rounded-md text-gray-700 hover:text-primary-600 hover:bg-primary-50 focus:outline-none"
               >
-                <span className="sr-only">Open main menu</span>
                 {isOpen ? (
                   <FiX className="block h-6 w-6" />
                 ) : (
                   <FiMenu className="block h-6 w-6" />
                 )}
-              </motion.button>
+              </button>
             </div>
           </div>
         </div>
-
-        {/* Mobile menu */}
-        <AnimatePresence>
-          {isOpen && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              className="md:hidden border-t border-gray-200"
-            >
-              <div className="px-2 pt-2 pb-3 space-y-1">
-                {navLinks.map((link) => (
-                  ((link.showFor === 'all') || (currentUser && link.showFor === userRole)) && (
-                    <Link
-                      key={link.path}
-                      to={link.path}
-                      onClick={() => setIsOpen(false)}
-                      className={`flex items-center px-3 py-2 text-base font-medium rounded-md transition-colors
-                        ${isActivePath(link.path)
-                          ? 'text-primary-600 bg-primary-50'
-                          : 'text-gray-700 hover:text-primary-600 hover:bg-primary-50'
-                        }`}
-                    >
-                      <link.icon className="w-5 h-5 mr-3" />
-                      {link.label}
-                    </Link>
-                  )
-                ))}
-
-                {currentUser ? (
-                  <>
-                    <Link
-                      to="/settings"
-                      onClick={() => setIsOpen(false)}
-                      className="flex items-center px-3 py-2 text-base font-medium text-gray-700 hover:bg-primary-50 hover:text-primary-600 rounded-md"
-                    >
-                      <FiSettings className="w-5 h-5 mr-3" />
-                      Settings
-                    </Link>
-                    <button
-                      onClick={() => {
-                        handleLogout();
-                        setIsOpen(false);
-                      }}
-                      className="flex items-center w-full px-3 py-2 text-base font-medium text-gray-700 hover:bg-primary-50 hover:text-primary-600 rounded-md"
-                    >
-                      <FiLogOut className="w-5 h-5 mr-3" />
-                      Sign out
-                    </button>
-                  </>
-                ) : (
-                  <Link
-                    to="/auth"
-                    onClick={() => setIsOpen(false)}
-                    className="flex items-center px-3 py-2 text-base font-medium text-primary-600 hover:text-primary-700 hover:bg-primary-50 rounded-md"
-                  >
-                    <FiUser className="w-5 h-5 mr-3" />
-                    Sign in
-                  </Link>
-                )}
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
       </motion.div>
+
+      {/* Mobile Navigation Menu */}
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="lg:hidden"
+          >
+            <div className="glass-effect shadow-lg backdrop-blur-md px-4 pt-2 pb-4 space-y-1 bg-white/90">
+              {navLinks.map((link) => (
+                ((link.showFor === 'all') || (currentUser && link.showFor === userRole)) && (
+                  <Link
+                    key={link.path}
+                    to={link.path}
+                    className={`flex items-center px-4 py-3 text-base font-medium rounded-md transition-colors
+                      ${isActivePath(link.path)
+                        ? 'text-primary-600 bg-primary-50'
+                        : 'text-gray-700 hover:text-primary-600 hover:bg-primary-50'
+                      }`}
+                  >
+                    <link.icon className="w-5 h-5 mr-2" />
+                    {link.label}
+                  </Link>
+                )
+              ))}
+              
+              {/* Mobile User Menu */}
+              {currentUser ? (
+                <>
+                  <div className="px-4 py-3">
+                    <div className="flex items-center">
+                      <FiUser className="w-5 h-5 mr-2 text-gray-700" />
+                      <span className="text-base font-medium text-gray-700">
+                        {currentUser.displayName || currentUser.email}
+                      </span>
+                    </div>
+                  </div>
+                  <button
+                    onClick={handleLogout}
+                    className="w-full flex items-center px-4 py-3 text-base font-medium text-gray-700 hover:text-primary-600 hover:bg-primary-50 rounded-md"
+                  >
+                    <FiLogOut className="w-5 h-5 mr-2" />
+                    Logout
+                  </button>
+                </>
+              ) : (
+                <Link
+                  to="/login"
+                  className="flex items-center px-4 py-3 text-base font-medium text-gray-700 hover:text-primary-600 hover:bg-primary-50 rounded-md"
+                >
+                  <FiUser className="w-5 h-5 mr-2" />
+                  Login
+                </Link>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </nav>
   );
 };
