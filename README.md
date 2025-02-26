@@ -7,3 +7,5 @@ Browse the code directly on GitHub:
    - `/src/contexts` - Context providers
    - `/src/config` - Configuration files
 
+## Citations
+- `CITATIONS` - Contains all citations of website
