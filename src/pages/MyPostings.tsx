@@ -1,3 +1,6 @@
+// MyPostings.tsx - Component for employers to view their submitted job postings
+// Shows job status (pending, approved, denied) from the admin review process
+
 import { useState, useEffect } from 'react';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../config/firebase';
@@ -5,20 +8,33 @@ import { useAuth } from '../contexts/AuthContext';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 
+/**
+ * Interface representing an employer's job posting
+ * Contains status field that reflects admin approval status
+ */
 interface JobPosting {
-  id: string;
-  title: string;
-  company: string;
-  location: string;
-  type: string;
-  salary: string;
-  description: string;
-  requirements: string[];
-  status: 'pending' | 'approved' | 'denied';
-  createdAt: string;
+  id: string;              // Unique job identifier
+  title: string;           // Job title
+  company: string;         // Company name
+  location: string;        // Job location
+  type: string;            // Job type (Full-time, Part-time, etc.)
+  salary: string;          // Salary information
+  description: string;     // Job description
+  requirements: string[];  // List of job requirements
+  status: 'pending' | 'approved' | 'denied'; // Current review status from admin
+  createdAt: string;       // When the job was created
 }
 
+/**
+ * Component that displays a job posting card with status indicator
+ * Shows different styling based on job approval status
+ */
 const JobCard = ({ job }: { job: JobPosting }) => {
+  /**
+   * Returns style and icon based on job status
+   * @param status - Current job status (pending, approved, denied)
+   * @returns Object with styling classes and icon for the status badge
+   */
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'approved':
@@ -125,29 +141,44 @@ const JobCard = ({ job }: { job: JobPosting }) => {
   );
 };
 
+/**
+ * MyPostings Component
+ * Allows employers to view and manage their submitted job postings
+ * Shows status of each job (pending review, approved, denied)
+ */
 const MyPostings = () => {
-  const [jobs, setJobs] = useState<JobPosting[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const { currentUser } = useAuth();
+  const [jobs, setJobs] = useState<JobPosting[]>([]);     // List of employer's job postings
+  const [loading, setLoading] = useState(true);          // Loading state
+  const [error, setError] = useState('');               // Error message
 
+  const { currentUser } = useAuth();                     // Current logged in user
+
+  /**
+   * Fetches all job postings created by the current employer
+   * Shows all jobs regardless of status (pending, approved, denied)
+   */
   useEffect(() => {
     const fetchMyJobs = async () => {
-      if (!currentUser) return;
-      
       try {
+        if (!currentUser) return;
+
+        // Query jobs collection for all jobs created by this employer
         const jobsRef = collection(db, 'jobs');
         const q = query(jobsRef, where('employerId', '==', currentUser.uid));
         const querySnapshot = await getDocs(q);
+        
+        // Process job data for display
         const jobsData = querySnapshot.docs.map(doc => ({
           id: doc.id,
-          ...doc.data()
+          ...doc.data(),
+          // Convert requirements string to array for easier rendering
+          requirements: doc.data().requirements?.split('\n').filter(Boolean) || []
         })) as JobPosting[];
-        
+
         setJobs(jobsData);
       } catch (err) {
         console.error('Error fetching jobs:', err);
-        setError('Failed to fetch your job postings');
+        setError('Failed to load your job postings');
       } finally {
         setLoading(false);
       }

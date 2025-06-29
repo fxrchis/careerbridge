@@ -1,3 +1,6 @@
+// AdminPanel.tsx - Main administrative interface component for site management
+// Provides tabs for user management, job approval workflow, and employer account creation
+
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -13,16 +16,22 @@ import {
   FiDollarSign,
   FiHome as FiBuilding
 } from 'react-icons/fi';
-import { createUser, getPendingJobs, updateJob } from '../utils/firebase';
-import { collection, query, getDocs } from 'firebase/firestore';
+import { createUser, updateJob } from '../utils/firebase';
+import { collection, query, getDocs, orderBy } from 'firebase/firestore';
 import { db, COLLECTIONS, ROLES, JOB_STATUS, UserDocument, JobDocument } from '../config/firebase';
 
 const AdminPanel = () => {
+  // Track which tab is currently active in the admin panel (users, jobs, or create)  
   const [activeTab, setActiveTab] = useState<'users' | 'jobs' | 'create'>('users');
+  // Store list of all users from Firestore
   const [users, setUsers] = useState<UserDocument[]>([]);
+  // Store list of jobs that need admin approval (status: pending)
   const [pendingJobs, setPendingJobs] = useState<JobDocument[]>([]);
+  // Overall loading state for the component
   const [loading, setLoading] = useState(true);
+  // Track loading state for individual job approval/rejection actions
   const [actionLoading, setActionLoading] = useState<{[key: string]: boolean}>({});
+  // Form data for creating new employer accounts
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -31,22 +40,46 @@ const AdminPanel = () => {
     password: ''
   });
 
+  // Fetch all users and pending jobs when component mounts
   useEffect(() => {
     fetchData();
   }, []);
 
+  /**
+   * Fetches both users and jobs data from Firestore database
+   * - Gets all users for the User Management tab
+   * - Gets all jobs and filters for pending ones that need admin approval
+   */
   const fetchData = async () => {
     try {
+      setLoading(true);
+      // 1. Fetch all users from the database
       const usersQuery = query(collection(db, COLLECTIONS.USERS));
       const usersSnapshot = await getDocs(usersQuery);
       const usersData = usersSnapshot.docs.map(doc => ({ 
-        uid: doc.id, 
-        ...doc.data() 
+        uid: doc.id, // Use document ID as the user ID
+        ...doc.data() // Spread all other user data fields
       })) as UserDocument[];
       setUsers(usersData);
-
-      const pendingJobsData = await getPendingJobs();
-      setPendingJobs(pendingJobsData);
+      
+      // 2. Fetch ALL jobs and filter for pending ones in memory
+      // Note: This approach avoids Firestore composite index requirements
+      const allJobsRef = collection(db, COLLECTIONS.JOBS);
+      const allJobsQuery = query(allJobsRef, orderBy('createdAt', 'desc')); // Newest first
+      const allJobsSnapshot = await getDocs(allJobsQuery);
+      const allJobs = allJobsSnapshot.docs.map(doc => ({
+        id: doc.id, // Use document ID as the job ID
+        ...(doc.data() as Omit<JobDocument, 'id'>) // Spread all other job data fields
+      })) as JobDocument[];
+      
+      // 3. Filter out only jobs with pending status
+      // Case-insensitive matching ensures we catch all pending jobs regardless of capitalization
+      const pendingJobs = allJobs.filter(job => 
+        job.status?.toLowerCase() === JOB_STATUS.PENDING.toLowerCase()
+      );
+      
+      console.log(`Found ${pendingJobs.length} pending jobs out of ${allJobs.length} total jobs`);
+      setPendingJobs(pendingJobs);
     } catch (error) {
       console.error('Error fetching data:', error);
     } finally {
@@ -54,34 +87,49 @@ const AdminPanel = () => {
     }
   };
 
+  /**
+   * Handles job approval or rejection actions by admin
+   * @param jobId - The ID of the job to update
+   * @param status - The new status for the job (approved or rejected)
+   */
   const handleJobAction = async (jobId: string, status: typeof JOB_STATUS[keyof typeof JOB_STATUS]) => {
+    // Show loading spinner for this specific job
     setActionLoading(prev => ({ ...prev, [jobId]: true }));
     
     try {
+      // Update job status in Firestore database
       await updateJob(jobId, { status });
-      // Remove the job from the list after action
+      // Remove the job from the pending jobs list immediately after action
       setPendingJobs(prev => prev.filter(job => job.id !== jobId));
     } catch (error) {
       console.error('Error updating job:', error);
     } finally {
+      // Hide loading spinner when done
       setActionLoading(prev => ({ ...prev, [jobId]: false }));
     }
   };
 
+  /**
+   * Creates a new employer account in the system
+   * @param e - The form submission event
+   */
   const handleCreateEmployer = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
     try {
+      // Create a new user with employer role in Firestore
       await createUser(formData.email, {
         name: formData.name,
         email: formData.email,
         phone: formData.phone,
-        role: ROLES.EMPLOYER,
+        role: ROLES.EMPLOYER, // Assign employer role to the user
         company: formData.company,
         createdAt: new Date().toISOString()
       });
+      // Reset form fields after successful creation
       setFormData({ name: '', email: '', phone: '', company: '', password: '' });
+      // Refresh data to update user list
       await fetchData();
     } catch (error) {
       console.error('Error creating employer:', error);

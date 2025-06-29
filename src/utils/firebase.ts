@@ -31,19 +31,25 @@ export const updateUser = async (userId: string, userData: Partial<UserDocument>
   await updateDoc(userRef, userData);
 };
 
+/**
+ * Creates a new job posting in the database with PENDING status
+ * All new jobs require admin approval before being visible to students
+ * @param jobData - Job information without id, timestamps, or status
+ * @returns The newly created job document
+ */
 export const createJob = async (jobData: Omit<JobDocument, 'id' | 'createdAt' | 'updatedAt' | 'status'>) => {
-  const jobRef = doc(collection(db, COLLECTIONS.JOBS));
+  const jobRef = doc(collection(db, COLLECTIONS.JOBS)); // Generate a new document reference with auto-ID
   const now = new Date().toISOString();
   
   const newJob: JobDocument = {
     id: jobRef.id,
     ...jobData,
-    status: JOB_STATUS.PENDING,
+    status: JOB_STATUS.PENDING, // All new jobs start as pending for admin approval
     createdAt: now,
     updatedAt: now,
   };
   
-  await setDoc(jobRef, newJob);
+  await setDoc(jobRef, newJob); // Save to Firestore
   return newJob;
 };
 
@@ -53,13 +59,19 @@ export const getJob = async (jobId: string) => {
   return jobSnap.exists() ? jobSnap.data() as JobDocument : null;
 };
 
+/**
+ * Updates an existing job document, including changing its approval status
+ * Used when admins approve or reject jobs in the AdminPanel
+ * @param jobId - The ID of the job to update
+ * @param jobData - Partial job data with fields to update
+ */
 export const updateJob = async (jobId: string, jobData: Partial<JobDocument>) => {
-  const jobRef = doc(db, COLLECTIONS.JOBS, jobId);
+  const jobRef = doc(db, COLLECTIONS.JOBS, jobId); // Get reference to the job document
   const updates = {
     ...jobData,
-    updatedAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(), // Always update the timestamp
   };
-  await updateDoc(jobRef, updates);
+  await updateDoc(jobRef, updates); // Update job in Firestore
 };
 
 export const deleteJob = async (jobId: string) => {
@@ -67,24 +79,35 @@ export const deleteJob = async (jobId: string) => {
   await deleteDoc(jobRef);
 };
 
+/**
+ * Retrieves all job postings with APPROVED status
+ * Only approved jobs are shown to students in the job listings
+ * @returns Array of approved job documents sorted by creation date (newest first)
+ */
 export const getApprovedJobs = async () => {
   const jobsRef = collection(db, COLLECTIONS.JOBS);
   const q = query(
     jobsRef,
-    where('status', '==', JOB_STATUS.APPROVED),
-    orderBy('createdAt', 'desc')
+    where('status', '==', JOB_STATUS.APPROVED), // Only fetch approved jobs
+    orderBy('createdAt', 'desc') // Sort newest first
   );
   
   const querySnapshot = await getDocs(q);
   return querySnapshot.docs.map(doc => doc.data() as JobDocument);
 };
 
+/**
+ * Retrieves all job postings with PENDING status that need admin approval
+ * These jobs are shown in the AdminPanel for admins to review
+ * Note: This query requires a Firestore composite index to work properly
+ * @returns Array of pending job documents sorted by creation date (newest first)
+ */
 export const getPendingJobs = async () => {
   const jobsRef = collection(db, COLLECTIONS.JOBS);
   const q = query(
     jobsRef,
-    where('status', '==', JOB_STATUS.PENDING),
-    orderBy('createdAt', 'desc')
+    where('status', '==', JOB_STATUS.PENDING), // Only fetch pending jobs
+    orderBy('createdAt', 'desc') // Sort newest first
   );
   
   const querySnapshot = await getDocs(q);

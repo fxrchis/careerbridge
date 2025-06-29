@@ -1,47 +1,69 @@
+// SubmitPosting.tsx - Component for employers to submit new job postings
+// New job postings start with 'pending' status and require admin approval
+
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { FiBriefcase, FiMapPin, FiDollarSign, FiFileText, FiList } from 'react-icons/fi';
 import { createJob } from '../utils/firebase';
 import { useAuth } from '../contexts/AuthContext';
-import { FiBriefcase, FiDollarSign, FiMapPin, FiFileText, FiList } from 'react-icons/fi';
 
+/**
+ * SubmitPosting Component
+ * Allows employers to create new job postings that will be sent for admin approval
+ */
 const SubmitPosting = () => {
-  const navigate = useNavigate();
-  const { currentUser } = useAuth();
-  const [loading, setLoading] = useState(false);
+  const navigate = useNavigate(); // For redirecting after submission
+  const { currentUser } = useAuth(); // Get logged-in user info
+  const [loading, setLoading] = useState(false); // Track form submission state
+  
+  // Form data for new job posting
   const [formData, setFormData] = useState({
-    title: '',
-    company: '',
-    location: '',
-    type: 'Full-time',
-    salary: '',
-    description: '',
-    requirements: ''
+    title: '',         // Job title
+    company: '',       // Company name
+    location: '',      // Job location
+    type: 'Full-time', // Job type (default: Full-time)
+    salary: '',        // Salary range
+    description: '',   // Detailed job description
+    requirements: ''   // Job requirements
   });
 
+  /**
+   * Handles job posting form submission
+   * Creates a new job with 'pending' status that requires admin approval
+   * @param e - Form submission event
+   */
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
+    setLoading(true); // Show loading indicator
 
     try {
+      // Verify user is logged in
       if (!currentUser) throw new Error('Must be logged in');
 
+      // Create new job posting in Firestore with pending status
+      // The createJob function will automatically set status to 'pending'
       await createJob({
         ...formData,
-        employerId: currentUser.uid,
+        employerId: currentUser.uid, // Link job to current user
       });
 
+      // Redirect to My Postings page after successful submission
       navigate('/my-postings');
     } catch (error) {
       console.error('Error creating job:', error);
     } finally {
-      setLoading(false);
+      setLoading(false); // Hide loading indicator
     }
   };
 
+  /**
+   * Updates form state when any input field changes
+   * @param e - Input change event from any form field
+   */
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData(prev => ({ ...prev, [name]: value })); // Update only the changed field
   };
 
   return (

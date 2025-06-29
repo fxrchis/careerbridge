@@ -1,3 +1,6 @@
+// JobPostings.tsx - Main component for browsing available job listings
+// Only displays jobs that have been approved by an admin
+
 import { useState, useEffect } from 'react';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../config/firebase';
@@ -5,18 +8,22 @@ import { useAuth } from '../contexts/AuthContext';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 
+/**
+ * Interface representing a job posting in the system
+ * Only approved jobs are displayed to students
+ */
 interface JobPosting {
-  id: string;
-  title: string;
-  company: string;
-  location: string;
-  type: string;
-  salary: string;
-  description: string;
-  requirements: string[];
-  status: string;
-  createdAt: string;
-  hasApplied?: boolean;
+  id: string;             // Unique job identifier
+  title: string;          // Job title 
+  company: string;        // Company name
+  location: string;       // Job location
+  type: string;           // Job type (Full-time, Part-time, etc.)
+  salary: string;         // Salary information
+  description: string;    // Job description
+  requirements: string[]; // List of job requirements
+  status: string;         // Job status (only 'approved' jobs are shown)
+  createdAt: string;      // When the job was created
+  hasApplied?: boolean;   // Whether current student has applied
 }
 
 const JobCard = ({ job }: { job: JobPosting }) => (
@@ -105,42 +112,50 @@ const JobPostings = () => {
 
   const { currentUser } = useAuth();
 
+  /**
+   * Fetches approved jobs from Firestore and checks which ones the user has applied to
+   * This only shows jobs that have been reviewed and approved by an admin
+   */
   useEffect(() => {
     const fetchJobs = async () => {
-      setLoading(true);
       try {
-        const jobsRef = collection(db, 'jobs');
-        const q = query(jobsRef, where('status', '==', 'approved'));
-        const querySnapshot = await getDocs(q);
-        let jobsData = querySnapshot.docs.map(doc => ({
+        setLoading(true);
+        setError('');
+        
+        // Get only approved jobs (note the 'status' filter)
+        // This ensures pending and rejected jobs are not shown to students
+        const jobsQuery = query(collection(db, 'jobs'), where('status', '==', 'approved'));
+        const jobsSnapshot = await getDocs(jobsQuery);
+        const jobData = jobsSnapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data(),
-          createdAt: doc.data().createdAt || new Date().toISOString(),
-          hasApplied: false
+          // Convert requirements string to array for easier rendering
+          requirements: doc.data().requirements?.split('\n').filter(Boolean) || []
         })) as JobPosting[];
 
+        // If user is logged in, check which jobs they've already applied to
         if (currentUser) {
-          const applicationsRef = collection(db, 'applications');
+          // Query applications collection to find student's applications
           const applicationsQuery = query(
-            applicationsRef,
-            where('userId', '==', currentUser.uid)
+            collection(db, 'applications'),
+            where('studentId', '==', currentUser.uid)
           );
           const applicationsSnapshot = await getDocs(applicationsQuery);
-          const appliedJobIds = new Set(
-            applicationsSnapshot.docs.map(doc => doc.data().jobId)
-          );
-
-          jobsData = jobsData.map(job => ({
+          const applications = applicationsSnapshot.docs.map(doc => doc.data());
+          
+          // Mark jobs that the user has already applied to with hasApplied flag
+          const jobsWithAppliedStatus = jobData.map(job => ({
             ...job,
-            hasApplied: appliedJobIds.has(job.id)
+            hasApplied: applications.some(app => app.jobId === job.id)
           }));
+          
+          setJobs(jobsWithAppliedStatus);
+        } else {
+          setJobs(jobData);
         }
-
-        setJobs(jobsData);
-        setFilteredJobs(jobsData);
       } catch (err) {
         console.error('Error fetching jobs:', err);
-        setError('Failed to load jobs');
+        setError('Failed to load job listings. Please try again later.');
       } finally {
         setLoading(false);
       }
@@ -149,6 +164,10 @@ const JobPostings = () => {
     fetchJobs();
   }, [currentUser]);
 
+  /**
+   * Filters job data based on user input
+   * Updates filteredJobs state with new filtered data
+   */
   useEffect(() => {
     const filtered = jobs.filter(job => {
       const matchesType = !filters.type || job.type === filters.type;
@@ -165,11 +184,15 @@ const JobPostings = () => {
     setFilteredJobs(filtered);
   }, [jobs, filters]);
 
+    /**
+   * Updates the job filter state when a filter value changes
+   * @param e - Change event from filter inputs
+   */
   const handleFilterChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFilters(prev => ({
       ...prev,
-      [name]: value
+      [name]: value // Update only the changed filter
     }));
   };
 
