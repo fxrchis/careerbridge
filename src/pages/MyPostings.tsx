@@ -168,12 +168,24 @@ const MyPostings = () => {
         const querySnapshot = await getDocs(q);
         
         // Process job data for display
-        const jobsData = querySnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data(),
-          // Convert requirements string to array for easier rendering
-          requirements: doc.data().requirements?.split('\n').filter(Boolean) || []
-        })) as JobPosting[];
+        const jobsData = querySnapshot.docs.map(doc => {
+          const data = doc.data();
+          // Handle requirements field that could be either string or array
+          let requirements = [];
+          if (data.requirements) {
+            if (typeof data.requirements === 'string') {
+              requirements = data.requirements.split('\n').filter(Boolean);
+            } else if (Array.isArray(data.requirements)) {
+              requirements = data.requirements;
+            }
+          }
+          
+          return {
+            id: doc.id,
+            ...data,
+            requirements: requirements
+          };
+        }) as JobPosting[];
 
         setJobs(jobsData);
       } catch (err) {

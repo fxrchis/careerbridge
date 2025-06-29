@@ -118,50 +118,79 @@ const JobPostings = () => {
    */
   useEffect(() => {
     const fetchJobs = async () => {
-      try {
-        setLoading(true);
-        setError('');
-        
-        // Get only approved jobs (note the 'status' filter)
-        // This ensures pending and rejected jobs are not shown to students
-        const jobsQuery = query(collection(db, 'jobs'), where('status', '==', 'approved'));
-        const jobsSnapshot = await getDocs(jobsQuery);
-        const jobData = jobsSnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data(),
-          // Convert requirements string to array for easier rendering
-          requirements: doc.data().requirements?.split('\n').filter(Boolean) || []
-        })) as JobPosting[];
-
-        // If user is logged in, check which jobs they've already applied to
-        if (currentUser) {
-          // Query applications collection to find student's applications
-          const applicationsQuery = query(
-            collection(db, 'applications'),
-            where('studentId', '==', currentUser.uid)
-          );
-          const applicationsSnapshot = await getDocs(applicationsQuery);
-          const applications = applicationsSnapshot.docs.map(doc => doc.data());
-          
-          // Mark jobs that the user has already applied to with hasApplied flag
-          const jobsWithAppliedStatus = jobData.map(job => ({
-            ...job,
-            hasApplied: applications.some(app => app.jobId === job.id)
-          }));
-          
-          setJobs(jobsWithAppliedStatus);
-        } else {
-          setJobs(jobData);
+    try {
+      console.log('Starting job fetch in JobPostings.tsx');
+      setLoading(true);
+      setError('');
+      
+      // Get only approved jobs (note the 'status' filter)
+      // This ensures pending and rejected jobs are not shown to students
+      console.log('Creating query for approved jobs');
+      const jobsQuery = query(collection(db, 'jobs'), where('status', '==', 'approved'));
+      console.log('Executing query...');
+      const jobsSnapshot = await getDocs(jobsQuery);
+      console.log(`Query returned ${jobsSnapshot.docs.length} approved jobs`);
+      
+      // Log raw data for debugging
+      jobsSnapshot.docs.forEach((doc, index) => {
+        console.log(`Job ${index + 1}:`, { id: doc.id, ...doc.data() });
+      });
+      
+      const jobData = jobsSnapshot.docs.map(doc => {
+        const data = doc.data();
+        // Handle requirements field that could be either string or array
+        let requirements = [];
+        if (data.requirements) {
+          if (typeof data.requirements === 'string') {
+            requirements = data.requirements.split('\n').filter(Boolean);
+          } else if (Array.isArray(data.requirements)) {
+            requirements = data.requirements;
+          }
         }
-      } catch (err) {
-        console.error('Error fetching jobs:', err);
-        setError('Failed to load job listings. Please try again later.');
-      } finally {
-        setLoading(false);
-      }
-    };
+        
+        return {
+          id: doc.id,
+          ...data,
+          requirements: requirements
+        };
+      }) as JobPosting[];
 
-    fetchJobs();
+      console.log('Processed job data:', jobData);
+
+      // If user is logged in, check which jobs they've already applied to
+      if (currentUser) {
+        console.log('User is logged in, checking for applications');
+        // Query applications collection to find student's applications
+        const applicationsQuery = query(
+          collection(db, 'applications'),
+          where('studentId', '==', currentUser.uid)
+        );
+        const applicationsSnapshot = await getDocs(applicationsQuery);
+        console.log(`Found ${applicationsSnapshot.docs.length} applications by this user`);
+        
+        const applications = applicationsSnapshot.docs.map(doc => doc.data());
+        
+        // Mark jobs that the user has already applied to with hasApplied flag
+        const jobsWithAppliedStatus = jobData.map(job => ({
+          ...job,
+          hasApplied: applications.some(app => app.jobId === job.id)
+        }));
+        
+        console.log('Setting jobs with application status:', jobsWithAppliedStatus);
+        setJobs(jobsWithAppliedStatus);
+      } else {
+        console.log('No user logged in, setting basic job data');
+        setJobs(jobData);
+      }
+    } catch (err) {
+      console.error('Error fetching jobs:', err);
+      setError('Failed to load job listings. Please try again later.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  fetchJobs();
   }, [currentUser]);
 
   /**

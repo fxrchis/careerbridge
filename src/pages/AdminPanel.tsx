@@ -56,29 +56,41 @@ const AdminPanel = () => {
       // 1. Fetch all users from the database
       const usersQuery = query(collection(db, COLLECTIONS.USERS));
       const usersSnapshot = await getDocs(usersQuery);
+      console.log(`Found ${usersSnapshot.docs.length} users`);
       const usersData = usersSnapshot.docs.map(doc => ({ 
         uid: doc.id, // Use document ID as the user ID
         ...doc.data() // Spread all other user data fields
       })) as UserDocument[];
       setUsers(usersData);
       
-      // 2. Fetch ALL jobs and filter for pending ones in memory
-      // Note: This approach avoids Firestore composite index requirements
+      // Fetch all jobs
+      console.log('Fetching all jobs...');
       const allJobsRef = collection(db, COLLECTIONS.JOBS);
       const allJobsQuery = query(allJobsRef, orderBy('createdAt', 'desc')); // Newest first
       const allJobsSnapshot = await getDocs(allJobsQuery);
+      console.log(`Found ${allJobsSnapshot.docs.length} total jobs`);
+      
+      // Debug: Log all jobs raw data
+      allJobsSnapshot.docs.forEach((doc, index) => {
+        console.log(`Job ${index + 1}:`, { id: doc.id, ...doc.data() });
+      });
+      
       const allJobs = allJobsSnapshot.docs.map(doc => ({
         id: doc.id, // Use document ID as the job ID
         ...(doc.data() as Omit<JobDocument, 'id'>) // Spread all other job data fields
       })) as JobDocument[];
       
-      // 3. Filter out only jobs with pending status
-      // Case-insensitive matching ensures we catch all pending jobs regardless of capitalization
-      const pendingJobs = allJobs.filter(job => 
-        job.status?.toLowerCase() === JOB_STATUS.PENDING.toLowerCase()
-      );
+      // Filter for pending jobs client-side
+      console.log('Filtering for pending jobs...');
+      console.log('JOB_STATUS.PENDING value:', JOB_STATUS.PENDING);
       
+      const pendingJobs = allJobs.filter(job => {
+        console.log(`Job ${job.id} status:`, job.status);
+        return job.status?.toLowerCase() === JOB_STATUS.PENDING.toLowerCase();
+      });
+
       console.log(`Found ${pendingJobs.length} pending jobs out of ${allJobs.length} total jobs`);
+      console.log('Pending jobs:', pendingJobs);
       setPendingJobs(pendingJobs);
     } catch (error) {
       console.error('Error fetching data:', error);

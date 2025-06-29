@@ -41,9 +41,22 @@ export const createJob = async (jobData: Omit<JobDocument, 'id' | 'createdAt' | 
   const jobRef = doc(collection(db, COLLECTIONS.JOBS)); // Generate a new document reference with auto-ID
   const now = new Date().toISOString();
   
+  // Process requirements to ensure it's an array
+  let requirements: string[] = [];
+  const reqField = jobData.requirements as string | string[] | undefined;
+  
+  if (reqField) {
+    if (typeof reqField === 'string') {
+      requirements = reqField.split('\n').filter(Boolean);
+    } else if (Array.isArray(reqField)) {
+      requirements = reqField;
+    }
+  }
+  
   const newJob: JobDocument = {
     id: jobRef.id,
     ...jobData,
+    requirements, // Use the processed requirements array
     status: JOB_STATUS.PENDING, // All new jobs start as pending for admin approval
     createdAt: now,
     updatedAt: now,

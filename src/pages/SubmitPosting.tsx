@@ -25,7 +25,7 @@ const SubmitPosting = () => {
     type: 'Full-time', // Job type (default: Full-time)
     salary: '',        // Salary range
     description: '',   // Detailed job description
-    requirements: ''   // Job requirements
+    requirements: '',  // Job requirements (stored as string in form, converted to array on submit)
   });
 
   /**
@@ -41,10 +41,16 @@ const SubmitPosting = () => {
       // Verify user is logged in
       if (!currentUser) throw new Error('Must be logged in');
 
+      // Convert requirements string to array
+      const requirementsArray = formData.requirements
+        ? formData.requirements.split('\n').filter(Boolean)
+        : [];
+
       // Create new job posting in Firestore with pending status
       // The createJob function will automatically set status to 'pending'
       await createJob({
         ...formData,
+        requirements: requirementsArray, // Pass requirements as array
         employerId: currentUser.uid, // Link job to current user
       });
 

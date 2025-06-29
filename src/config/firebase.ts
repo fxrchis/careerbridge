@@ -85,7 +85,7 @@ export interface JobDocument {
   company: string;    // Company offering the job
   location: string;   // Job location
   description: string; // Detailed job description
-  requirements: string; // Job requirements
+  requirements: string[]; // Job requirements as an array of strings
   salary: string;     // Salary information
   type: string;       // Job type (full-time, part-time, etc.)
   employerId: string; // ID of employer who created the posting
