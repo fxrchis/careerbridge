@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { doc, getDoc, collection, addDoc, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { useAuth } from '../contexts/AuthContext';
+import { useForm } from 'react-hook-form';
 
 interface JobPosting {
   id: string;
@@ -16,15 +17,29 @@ interface JobPosting {
   requirements: string;
 }
 
+interface ApplicationForm {
+  fullName: string;
+  email: string;
+  phone: string;
+  education: string;
+  school: string;
+  gradYear: string;
+  experience: string;
+  skills: string;
+  availability: string;
+  coverLetter: string;
+}
+
 const StudentApply = () => {
   const { jobId } = useParams();
   const navigate = useNavigate();
   const { currentUser } = useAuth();
   const [job, setJob] = useState<JobPosting | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [resume, setResume] = useState<File | null>(null);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  
+  const { register, handleSubmit: handleFormSubmit, formState: { errors } } = useForm<ApplicationForm>();
 
   useEffect(() => {
     if (!currentUser) {
@@ -52,30 +67,8 @@ const StudentApply = () => {
     }
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      // Check if file is PDF
-      if (file.type !== 'application/pdf') {
-        setError('Please upload a PDF file');
-        return;
-      }
-      // Check if file size is less than 5MB
-      if (file.size > 5 * 1024 * 1024) {
-        setError('File size should be less than 5MB');
-        return;
-      }
-      setResume(file);
-      setError('');
-    }
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!currentUser || !job || !resume) {
-      setError('Please upload your resume');
-      return;
-    }
+  const onSubmit = async (data: ApplicationForm) => {
+    if (!currentUser || !job) return;
 
     setSubmitting(true);
     setError('');
@@ -95,15 +88,21 @@ const StudentApply = () => {
         setSubmitting(false);
         return;
       }
+      
+      // Get employer ID from the job document
+      const jobRef = doc(db, 'jobs', jobId!);
+      const jobDoc = await getDoc(jobRef);
+      const employerId = jobDoc.data()?.userId || jobDoc.data()?.employerId;
 
       const applicationData = {
         jobId,
         userId: currentUser.uid,
+        employerId: employerId, // Add employer ID to connect applications to employers
         status: 'pending',
         createdAt: new Date().toISOString(),
         jobTitle: job.title,
         company: job.company,
-        resumeName: resume.name,
+        ...data,
         appliedAt: new Date().toISOString()
       };
 
@@ -165,51 +164,193 @@ const StudentApply = () => {
           </div>
 
           {/* Application Form */}
-          <form onSubmit={handleSubmit} className="p-6 space-y-6">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-4">
-                Upload your resume (PDF format, max 5MB)
-              </label>
-              <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-lg hover:border-primary-500 transition-colors">
-                <div className="space-y-1 text-center">
-                  <svg
-                    className="mx-auto h-12 w-12 text-gray-400"
-                    stroke="currentColor"
-                    fill="none"
-                    viewBox="0 0 48 48"
-                    aria-hidden="true"
-                  >
-                    <path
-                      d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02"
-                      strokeWidth={2}
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                  <div className="flex text-sm text-gray-600">
-                    <label
-                      htmlFor="resume-upload"
-                      className="relative cursor-pointer bg-white rounded-md font-medium text-primary-600 hover:text-primary-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-primary-500"
-                    >
-                      <span>Upload a file</span>
-                      <input
-                        id="resume-upload"
-                        name="resume-upload"
-                        type="file"
-                        accept=".pdf"
-                        className="sr-only"
-                        onChange={handleFileChange}
-                        required
-                      />
-                    </label>
-                    <p className="pl-1">or drag and drop</p>
-                  </div>
-                  <p className="text-xs text-gray-500">PDF up to 5MB</p>
-                  {resume && (
-                    <p className="text-sm text-primary-600 font-medium mt-2">
-                      Selected: {resume.name}
-                    </p>
+          <form onSubmit={handleFormSubmit(onSubmit)} className="p-6 space-y-6">
+            {/* Personal Information Section */}
+            <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 mb-6">
+              <h3 className="text-lg font-medium text-gray-900 mb-3">Personal Information</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label htmlFor="fullName" className="block text-sm font-medium text-gray-700 mb-1">
+                    Full Name *
+                  </label>
+                  <input
+                    {...register('fullName', { required: 'Full name is required' })}
+                    type="text"
+                    id="fullName"
+                    className="w-full p-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500"
+                    placeholder="Your full name"
+                  />
+                  {errors.fullName && (
+                    <p className="text-red-500 text-xs mt-1">{errors.fullName.message}</p>
                   )}
+                </div>
+                
+                <div>
+                  <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+                    Email Address *
+                  </label>
+                  <input
+                    {...register('email', { 
+                      required: 'Email is required',
+                      pattern: {
+                        value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
+                        message: 'Invalid email address'
+                      }
+                    })}
+                    type="email"
+                    id="email"
+                    className="w-full p-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500"
+                    placeholder="Your email address"
+                  />
+                  {errors.email && (
+                    <p className="text-red-500 text-xs mt-1">{errors.email.message}</p>
+                  )}
+                </div>
+                
+                <div>
+                  <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-1">
+                    Phone Number *
+                  </label>
+                  <input
+                    {...register('phone', { required: 'Phone number is required' })}
+                    type="tel"
+                    id="phone"
+                    className="w-full p-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500"
+                    placeholder="Your phone number"
+                  />
+                  {errors.phone && (
+                    <p className="text-red-500 text-xs mt-1">{errors.phone.message}</p>
+                  )}
+                </div>
+                
+                <div>
+                  <label htmlFor="availability" className="block text-sm font-medium text-gray-700 mb-1">
+                    Availability *
+                  </label>
+                  <select
+                    {...register('availability', { required: 'Availability is required' })}
+                    id="availability"
+                    className="w-full p-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500"
+                  >
+                    <option value="">Select availability</option>
+                    <option value="Full-time">Full-time</option>
+                    <option value="Part-time">Part-time</option>
+                    <option value="Weekends">Weekends only</option>
+                    <option value="Evenings">Evenings only</option>
+                    <option value="Summers">Summer only</option>
+                    <option value="Flexible">Flexible</option>
+                  </select>
+                  {errors.availability && (
+                    <p className="text-red-500 text-xs mt-1">{errors.availability.message}</p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Education Section */}
+            <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 mb-6">
+              <h3 className="text-lg font-medium text-gray-900 mb-3">Education</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label htmlFor="education" className="block text-sm font-medium text-gray-700 mb-1">
+                    Education Level *
+                  </label>
+                  <select
+                    {...register('education', { required: 'Education level is required' })}
+                    id="education"
+                    className="w-full p-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500"
+                  >
+                    <option value="">Select education level</option>
+                    <option value="Freshman">High School Freshman</option>
+                    <option value="Sophomore">High School Sophomore</option>
+                    <option value="Junior">High School Junior</option>
+                    <option value="Senior">High School Senior</option>
+                    <option value="College">College Student</option>
+                    <option value="Graduate">High School Graduate</option>
+                  </select>
+                  {errors.education && (
+                    <p className="text-red-500 text-xs mt-1">{errors.education.message}</p>
+                  )}
+                </div>
+                
+                <div>
+                  <label htmlFor="school" className="block text-sm font-medium text-gray-700 mb-1">
+                    School/Institution *
+                  </label>
+                  <input
+                    {...register('school', { required: 'School name is required' })}
+                    type="text"
+                    id="school"
+                    className="w-full p-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500"
+                    placeholder="Your school name"
+                  />
+                  {errors.school && (
+                    <p className="text-red-500 text-xs mt-1">{errors.school.message}</p>
+                  )}
+                </div>
+                
+                <div>
+                  <label htmlFor="gradYear" className="block text-sm font-medium text-gray-700 mb-1">
+                    Graduation Year *
+                  </label>
+                  <input
+                    {...register('gradYear', { required: 'Graduation year is required' })}
+                    type="text"
+                    id="gradYear"
+                    className="w-full p-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500"
+                    placeholder="Expected graduation year"
+                  />
+                  {errors.gradYear && (
+                    <p className="text-red-500 text-xs mt-1">{errors.gradYear.message}</p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Experience & Skills Section */}
+            <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 mb-6">
+              <h3 className="text-lg font-medium text-gray-900 mb-3">Experience & Skills</h3>
+              <div className="grid grid-cols-1 gap-4">
+                <div>
+                  <label htmlFor="experience" className="block text-sm font-medium text-gray-700 mb-1">
+                    Work/Volunteer Experience
+                  </label>
+                  <textarea
+                    {...register('experience')}
+                    id="experience"
+                    rows={3}
+                    className="w-full p-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500"
+                    placeholder="Describe your previous work or volunteer experience (if any)"
+                  ></textarea>
+                </div>
+                
+                <div>
+                  <label htmlFor="skills" className="block text-sm font-medium text-gray-700 mb-1">
+                    Skills & Qualifications *
+                  </label>
+                  <textarea
+                    {...register('skills', { required: 'Skills are required' })}
+                    id="skills"
+                    rows={3}
+                    className="w-full p-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500"
+                    placeholder="List your relevant skills, certifications, or qualifications"
+                  ></textarea>
+                  {errors.skills && (
+                    <p className="text-red-500 text-xs mt-1">{errors.skills.message}</p>
+                  )}
+                </div>
+                
+                <div>
+                  <label htmlFor="coverLetter" className="block text-sm font-medium text-gray-700 mb-1">
+                    Cover Letter / Additional Information
+                  </label>
+                  <textarea
+                    {...register('coverLetter')}
+                    id="coverLetter"
+                    rows={5}
+                    className="w-full p-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500"
+                    placeholder="Tell us why you're interested in this position and why you would be a good fit"
+                  ></textarea>
                 </div>
               </div>
             </div>
@@ -225,11 +366,11 @@ const StudentApply = () => {
             <div className="flex justify-end">
               <motion.button
                 type="submit"
-                disabled={submitting || !resume}
+                disabled={submitting}
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 className={`inline-flex justify-center items-center px-6 py-3 border border-transparent text-base font-medium rounded-xl text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-colors ${
-                  (submitting || !resume) ? 'opacity-50 cursor-not-allowed' : ''
+                  submitting ? 'opacity-50 cursor-not-allowed' : ''
                 }`}
               >
                 {submitting ? (

@@ -11,7 +11,6 @@ import {
   FiPhone,
   FiMapPin,
   FiDollarSign,
-  FiCalendar,
   FiHome as FiBuilding
 } from 'react-icons/fi';
 import { createUser, getPendingJobs, updateJob } from '../utils/firebase';
@@ -23,6 +22,7 @@ const AdminPanel = () => {
   const [users, setUsers] = useState<UserDocument[]>([]);
   const [pendingJobs, setPendingJobs] = useState<JobDocument[]>([]);
   const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState<{[key: string]: boolean}>({});
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -55,11 +55,16 @@ const AdminPanel = () => {
   };
 
   const handleJobAction = async (jobId: string, status: typeof JOB_STATUS[keyof typeof JOB_STATUS]) => {
+    setActionLoading(prev => ({ ...prev, [jobId]: true }));
+    
     try {
       await updateJob(jobId, { status });
-      await fetchData();
+      // Remove the job from the list after action
+      setPendingJobs(prev => prev.filter(job => job.id !== jobId));
     } catch (error) {
       console.error('Error updating job:', error);
+    } finally {
+      setActionLoading(prev => ({ ...prev, [jobId]: false }));
     }
   };
 
@@ -86,10 +91,10 @@ const AdminPanel = () => {
   };
 
   const tabs = [
-    { id: 'users', label: 'User Management', icon: FiUsers },
-    { id: 'jobs', label: 'Job Approvals', icon: FiBriefcase },
-    { id: 'create', label: 'Create Employer', icon: FiUserPlus }
-  ] as const;
+    { id: 'users' as const, label: 'User Management', icon: FiUsers },
+    { id: 'jobs' as const, label: 'Job Approvals', icon: FiBriefcase },
+    { id: 'create' as const, label: 'Create Employer', icon: FiUserPlus }
+  ];
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-green-50 to-white py-8 px-4 sm:py-12 sm:px-6 lg:px-8">
@@ -196,85 +201,104 @@ const AdminPanel = () => {
                   exit={{ opacity: 0, y: -20 }}
                   className="space-y-6"
                 >
-                  {pendingJobs.map((job) => (
-                    <motion.div
-                      key={job.id}
-                      className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6 hover:shadow-md transition-shadow"
-                      whileHover={{ y: -2 }}
-                    >
-                      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
-                        <div>
-                          <h3 className="text-lg sm:text-xl font-semibold text-gray-900">{job.title}</h3>
-                          <div className="mt-2 flex items-center text-sm text-gray-500">
-                            <FiBuilding className="mr-2" />
-                            {job.company}
-                          </div>
-                        </div>
-                        <div className="flex space-x-3">
-                          <motion.button
-                            whileHover={{ scale: 1.05 }}
-                            whileTap={{ scale: 0.95 }}
-                            onClick={() => handleJobAction(job.id, JOB_STATUS.APPROVED)}
-                            className="flex-1 sm:flex-none inline-flex items-center justify-center px-4 py-2 rounded-xl text-sm font-medium text-white bg-green-600 hover:bg-green-700 transition-colors"
-                          >
-                            <FiCheck className="w-4 h-4 mr-2" />
-                            Approve
-                          </motion.button>
-                          <motion.button
-                            whileHover={{ scale: 1.05 }}
-                            whileTap={{ scale: 0.95 }}
-                            onClick={() => handleJobAction(job.id, JOB_STATUS.REJECTED)}
-                            className="flex-1 sm:flex-none inline-flex items-center justify-center px-4 py-2 rounded-xl text-sm font-medium text-white bg-red-600 hover:bg-red-700 transition-colors"
-                          >
-                            <FiX className="w-4 h-4 mr-2" />
-                            Reject
-                          </motion.button>
-                        </div>
+                  <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                    <h3 className="text-lg font-semibold text-gray-800 mb-4">Pending Job Approvals</h3>
+                    
+                    {loading ? (
+                      <div className="flex justify-center items-center py-12">
+                        <svg className="animate-spin h-8 w-8 text-green-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
                       </div>
-
-                      <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
-                        <div className="space-y-4">
-                          <div>
-                            <h4 className="text-sm font-medium text-gray-900 mb-2">Description</h4>
-                            <p className="text-sm text-gray-600">{job.description}</p>
-                          </div>
-                          <div className="flex flex-wrap items-center gap-4">
-                            <div className="flex items-center text-sm text-gray-500">
-                              <FiMapPin className="mr-2" />
-                              {job.location}
-                            </div>
-                            <div className="flex items-center text-sm text-gray-500">
-                              <FiDollarSign className="mr-2" />
-                              {job.salary}
-                            </div>
-                          </div>
-                        </div>
-                        <div className="space-y-4">
-                          <div>
-                            <h4 className="text-sm font-medium text-gray-900 mb-2">Requirements</h4>
-                            <p className="text-sm text-gray-600">{job.requirements}</p>
-                          </div>
-                          <div className="flex flex-wrap items-center gap-4">
-                            <div className="flex items-center text-sm text-gray-500">
-                              <FiBriefcase className="mr-2" />
-                              {job.type}
-                            </div>
-                            <div className="flex items-center text-sm text-gray-500">
-                              <FiCalendar className="mr-2" />
-                              {new Date(job.createdAt).toLocaleDateString()}
-                            </div>
-                          </div>
-                        </div>
+                    ) : pendingJobs.length === 0 ? (
+                      <div className="bg-gray-50 rounded-xl p-8 text-center">
+                        <FiAlertTriangle className="mx-auto text-gray-400 w-12 h-12 mb-4" />
+                        <h4 className="text-xl font-medium text-gray-700 mb-2">No Pending Jobs</h4>
+                        <p className="text-gray-500">All job postings have been reviewed. Check back later for new submissions.</p>
                       </div>
-                    </motion.div>
-                  ))}
-                  {pendingJobs.length === 0 && (
-                    <div className="text-center py-12">
-                      <FiAlertTriangle className="mx-auto h-12 w-12 text-gray-400" />
-                      <h3 className="mt-4 text-lg font-medium text-gray-900">No pending jobs</h3>
-                      <p className="mt-2 text-gray-500">There are no jobs waiting for approval at the moment.</p>
-                    </div>
-                  )}
+                    ) : (
+                      <div className="space-y-6">
+                        {pendingJobs.map((job) => (
+                          <div key={job.id} className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+                            <div className="p-5">
+                              <div className="flex justify-between mb-4">
+                                <div>
+                                  <h4 className="text-xl font-semibold text-gray-800">{job.title}</h4>
+                                  <p className="text-gray-600">{job.company}</p>
+                                </div>
+                                <div className="text-sm text-gray-500">
+                                  Posted on {new Date(job.createdAt).toLocaleDateString()}
+                                </div>
+                              </div>
+                              
+                              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+                                <div>
+                                  <span className="text-sm font-medium text-gray-500 block">Location</span>
+                                  <span className="flex items-center text-gray-700">
+                                    <FiMapPin className="mr-1" /> {job.location}
+                                  </span>
+                                </div>
+                                <div>
+                                  <span className="text-sm font-medium text-gray-500 block">Type</span>
+                                  <span className="text-gray-700">{job.type}</span>
+                                </div>
+                                <div>
+                                  <span className="text-sm font-medium text-gray-500 block">Salary</span>
+                                  <span className="flex items-center text-gray-700">
+                                    <FiDollarSign className="mr-1" /> {job.salary}
+                                  </span>
+                                </div>
+                                <div>
+                                  <span className="text-sm font-medium text-gray-500 block">Employer ID</span>
+                                  <span className="text-gray-700 font-mono text-xs">{job.employerId}</span>
+                                </div>
+                              </div>
+                              
+                              <div className="mb-4">
+                                <h5 className="text-sm font-medium text-gray-500 mb-2">Description</h5>
+                                <p className="text-gray-700 text-sm line-clamp-3">{job.description}</p>
+                              </div>
+                              
+                              <div className="mb-4">
+                                <h5 className="text-sm font-medium text-gray-500 mb-2">Requirements</h5>
+                                <p className="text-gray-700 text-sm line-clamp-3">{job.requirements}</p>
+                              </div>
+                              
+                              <div className="flex items-center justify-between border-t border-gray-100 pt-4 mt-4">
+                                <button 
+                                  onClick={() => handleJobAction(job.id, JOB_STATUS.REJECTED)}
+                                  disabled={actionLoading[job.id]}
+                                  className="inline-flex items-center px-4 py-2 border border-red-300 shadow-sm text-sm font-medium rounded-md text-red-700 bg-red-50 hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50"
+                                >
+                                  {actionLoading[job.id] ? (
+                                    <svg className="animate-spin h-4 w-4 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                  ) : <FiX className="mr-2 h-4 w-4" />}
+                                  Reject Job
+                                </button>
+                                <button 
+                                  onClick={() => handleJobAction(job.id, JOB_STATUS.APPROVED)} 
+                                  disabled={actionLoading[job.id]}
+                                  className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50"
+                                >
+                                  {actionLoading[job.id] ? (
+                                    <svg className="animate-spin h-4 w-4 mr-2 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                  ) : <FiCheck className="mr-2 h-4 w-4" />}
+                                  Approve Job
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </motion.div>
               )}
 

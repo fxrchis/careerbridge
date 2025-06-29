@@ -47,6 +47,7 @@ const Navbar = () => {
     { path: '/help', label: 'Help', icon: FiHelpCircle, showFor: 'all' },
     { path: '/submit-posting', label: 'Post a Job', icon: FiBriefcase, showFor: ROLES.EMPLOYER },
     { path: '/my-postings', label: 'My Postings', icon: FiBriefcase, showFor: ROLES.EMPLOYER },
+    { path: '/employer/applications', label: 'Applications', icon: FiBriefcase, showFor: ROLES.EMPLOYER },
     { path: '/my-applications', label: 'My Applications', icon: FiBriefcase, showFor: ROLES.STUDENT },
     { path: '/admin', label: 'Admin Panel', icon: FiSettings, showFor: ROLES.ADMIN },
     { path: '/judges-access', label: 'Judges Access', icon: FiBriefcase, showFor: 'all' },
